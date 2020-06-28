@@ -1,0 +1,163 @@
+package encryptdecrypt;
+
+import java.io.*;
+import java.util.*;
+
+abstract class Operation {
+
+    String operation;
+    int key;
+    StringBuilder input;
+
+    Operation(String operation, int key, StringBuilder input) {
+        this.operation = operation;
+        this.key = key;
+        this.input = input;
+    }
+
+    StringBuilder execute(String operation) {
+        switch (operation) {
+            case "enc":
+                return encrypt(key, input);
+            case "dec":
+                return decrypt(key, input);
+            default:
+                return new StringBuilder("Input Error.");
+        }
+    }
+
+    abstract StringBuilder encrypt(int key, StringBuilder input);
+
+    abstract StringBuilder decrypt(int key, StringBuilder input);
+}
+
+class OperationFactory {
+    public static Operation newInstance(String algorithm, String operation, int key, StringBuilder input) {
+        switch (algorithm) {
+            case "shift":
+                return new ShiftMethod(operation, key, input);
+            case "unicode":
+                return new UnicodeMethod(operation, key, input);
+            default:
+                return null;
+        }
+    }
+}
+
+class ShiftMethod extends Operation {
+
+    ShiftMethod(String operation, int key, StringBuilder input) {
+        super(operation, key, input);
+    }
+
+    @Override
+    protected StringBuilder encrypt(int key, StringBuilder input) {
+        for (int i = 0; i < input.length(); i++) {
+            if (input.charAt(i) != ' ' && Character.toString(input.charAt(i)).matches("[a-z]")) {
+                int originalPosition = input.charAt(i) - 'a';
+                char newChar = (char) ('a' + (originalPosition + key) % 26);
+                input.setCharAt(i, newChar);
+            } else if (input.charAt(i) != ' ' && Character.toString(input.charAt(i)).matches("[A-Z]")) {
+                int originalPosition = input.charAt(i) - 'A';
+                char newChar = (char) ('A' + (originalPosition + key) % 26);
+                input.setCharAt(i, newChar);
+            }
+        }
+        return input;
+    }
+
+    @Override
+    protected StringBuilder decrypt(int key, StringBuilder input) {
+        return encrypt(26 - (key % 26), input);
+    }
+}
+
+class UnicodeMethod extends Operation {
+
+    UnicodeMethod(String operation, int key, StringBuilder input) {
+        super(operation, key, input);
+    }
+
+    @Override
+    protected StringBuilder encrypt(int key, StringBuilder input) {
+        for (int i = 0; i < input.length(); i++) {
+            input.setCharAt(i, (char) (input.charAt(i) + key));
+        }
+        return input;
+    }
+
+    @Override
+    protected StringBuilder decrypt(int key, StringBuilder input) {
+        return encrypt(-key, input);
+    }
+}
+
+
+public class Main {
+    private static String operation = "enc";
+    private static int key = 0;
+    private static StringBuilder input = new StringBuilder();
+    private static boolean isData = false;
+    private static boolean isIn = false;
+    private static boolean isOut = false;
+    private static String inDataPath = "";
+    private static String outDataPath = "";
+    private static String algorithm = "shift";
+
+    public static void main(String[] args) throws IOException {
+        StringBuilder result = new StringBuilder();
+
+        argsReader(args);
+
+        if (isIn && isData) {
+            Operation instance = OperationFactory.newInstance(algorithm, operation, key, input);
+            result.append(instance.execute(operation));
+        } else if (isIn) {
+            try (Scanner sc = new Scanner(new File(inDataPath))) {
+                Operation instance = OperationFactory.newInstance(algorithm, operation, key, input.append(sc.nextLine()));
+                result.append(instance.execute(operation));
+            }
+        }
+        output(result, isOut);
+    }
+
+    static void argsReader(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "-mode":
+                    operation = args[i + 1];
+                    break;
+                case "-key":
+                    key = Integer.parseInt(args[i + 1]);
+                    break;
+                case "-data":
+                    isData = true;
+                    input.append(args[i + 1]);
+                    break;
+                case "-out":
+                    isOut = true;
+                    outDataPath = args[i + 1];
+                    break;
+                case "-in":
+                    isIn = true;
+                    inDataPath = args[i + 1];
+                    break;
+                case "-alg":
+                    algorithm = args[i + 1];
+                    break;
+            }
+        }
+    }
+
+    static void output(StringBuilder result, boolean isOut) throws IOException {
+        if (isOut) {
+            File outFile = new File(outDataPath);
+            FileWriter writer = new FileWriter(outFile);
+            writer.write(result.toString());
+            writer.close();
+        } else {
+            System.out.println(result.toString());
+        }
+    }
+}
+
